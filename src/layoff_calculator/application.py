@@ -60,12 +60,15 @@ def _machine(env: simpy.Environment, workers: simpy.PriorityResource, seed: np.r
         else:
             wait_result = yield wait_for_repair | wait_for_end
 
+        if wait_for_end in wait_result or wait_for_auto_repair in wait_result:
+            if wait_for_repair in wait_result:
+                workers.release(wait_for_repair)
+            else:
+                wait_for_repair.cancel()
         if wait_for_end in wait_result:
-            wait_for_repair.cancel()
             result.profit -= count_working_hours(break_hours, end_hours) * machine.profit_per_hour
             break
         if wait_for_auto_repair in wait_result:
-            wait_for_repair.cancel()
             _ = rng.exponential() # Must exhaust one iteration of rng for fair CRN
             result.profit -= count_working_hours(break_hours, env.now) * machine.profit_per_hour
             continue
