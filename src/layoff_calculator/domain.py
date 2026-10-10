@@ -15,8 +15,8 @@ class RepairStrategy(Enum):
     FIFO = 1
     WSPT = 2
 
-@dataclass
-class ConstantParams(frozen=True):
+@dataclass(frozen=True)
+class ConstantParams:
     machines: list[Machine]
     costs_per_hour_3: float
     costs_per_hour_6: float
