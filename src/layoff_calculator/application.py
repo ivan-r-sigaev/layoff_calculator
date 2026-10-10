@@ -1,4 +1,4 @@
-from domain import RunParams, RunResult, Machine, RepairStrategy
+from layoff_calculator.domain import RunParams, RunResult, Machine, RepairStrategy
 import numpy as np
 from scipy import stats
 import simpy
