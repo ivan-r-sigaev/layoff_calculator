@@ -128,16 +128,19 @@ class RunEngine:
             profit_without_3 = _simulate_run(self._params, seed, False)
             self._results.append(profit_without_3 - profit_with_3)
 
-    def confidence_range(self, conf_level: float) -> tuple[float, float]:
-        n = len(self.results)
-        if n < 2:
-            return (float('inf'), float('-inf'))
-        mean = np.mean(self.results)
-        se = stats.sem(self.results)
-        t = stats.t.ppf((1 + conf_level) / 2, n - 1)
-        margin = t * se
-        return (mean - margin, mean + margin)
+    def mean_profit(self) -> float:
+        if not self._results:
+            return 0.0
+        return np.mean(self._results)
 
+    def bayes_positive_profit_p(self) -> float:
+        d = self._results
+        n = len(d)
+        if n < 2:
+            return 0.5
+        t = np.mean(d) / (np.std(d, ddof=1) / np.sqrt(n))
+        return float(stats.t.cdf(t, df=n - 1))
+        
     @property
     def results(self) -> tuple[float, ...]:
         return tuple(self._results)
