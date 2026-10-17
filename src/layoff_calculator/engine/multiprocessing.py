@@ -164,7 +164,7 @@ class Engine:
                 except Exception as e:
                     result.set_exception(e)
             
-            f_with_3.add_done_callback(_set_result_on_ready)
-            f_without_3.add_done_callback(_set_result_on_ready)
+        f_with_3.add_done_callback(_set_result_on_ready)
+        f_without_3.add_done_callback(_set_result_on_ready)
 
-            return result
+        return result
