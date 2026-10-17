@@ -1,4 +1,4 @@
-from layoff_calculator.models import ConstantParams, SimulationParams, Machine, RepairStrategy
+from layoff_calculator.models import ConstantParams, Machine, RepairStrategy
 import math
 from dataclasses import dataclass
 import simpy
