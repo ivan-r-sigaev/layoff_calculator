@@ -84,28 +84,28 @@ class Engine:
         mp_context = mp.get_context("spawn")
         self._executor: ProcessPoolExecutor = ProcessPoolExecutor(max_workers=simulation.max_workers, mp_context=mp_context)
 
+    @property
     def submitted_runs_count(self) -> int:
-        self._check_pending_results()
         return self._submitted_runs_count
 
+    @property
     def completed_runs_count(self) -> int:
-        self._check_pending_results()
         return self._completed_runs_count
 
+    @property
     def pending_runs_count(self) -> int:
-        self._check_pending_results()
         return self._submitted_runs_count - self._completed_runs_count
 
+    @property
     def layoff_profit_mean(self) -> float:
-        self._check_pending_results()
         return self._results.layoff_profit_mean()
 
+    @property
     def layoff_profit_stdev(self) -> float:
-        self._check_pending_results()
         return self._results.layoff_profit_stdev()
 
+    @property
     def layoff_profit_bayesian_p(self) -> float:
-        self._check_pending_results()
         return self._results.layoff_profit_bayesian_p()
 
     def make_runs(self, count: int) -> None:
@@ -116,6 +116,12 @@ class Engine:
             self._pending_results.append(f_split_run)
             self._submitted_runs_count += 1
 
+    def check_pending_results(self) -> None:
+        while len(self._pending_results) != 0 and self._pending_results[0].done():
+            self._completed_runs_count += 1
+            result = self._pending_results.popleft().result()
+            self._results.add(result)
+
     def close(self) -> None:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
@@ -124,12 +130,6 @@ class Engine:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-
-    def _check_pending_results(self) -> None:
-        while len(self._pending_results) != 0 and self._pending_results[0].done():
-            self._completed_runs_count += 1
-            result = self._pending_results.popleft().result()
-            self._results.add(result)
 
     def _submit_split_run(self, seeder: np.random.SeedSequence) -> Future[SplitRunResult]:
         seeder = np.random.SeedSequence(**seeder.state)
