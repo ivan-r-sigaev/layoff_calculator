@@ -1,5 +1,5 @@
 from layoff_calculator.engine.simulation import SimulationParams, RunParams, RunResult, simulate_run
-from layoff_calculator.domain import ConstantParams
+from layoff_calculator.models import ConstantParams
 import statistics
 import multiprocessing as mp
 from threading import Lock
