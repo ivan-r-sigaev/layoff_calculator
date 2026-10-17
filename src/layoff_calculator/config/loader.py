@@ -2,7 +2,7 @@ import tomllib
 from typing import Any
 from pathlib import Path
 from layoff_calculator.domain import Machine, ConstantParams
-from layoff_calculator.infrastructure.config.common import TomlName, ConfigError
+from layoff_calculator.config.common import TomlName, ConfigError
 
 def load_config(path: str | Path) -> ConstantParams:
     path = Path(path)

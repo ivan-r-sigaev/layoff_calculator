@@ -2,7 +2,7 @@ import tomli_w
 import math
 from pathlib import Path
 from layoff_calculator.domain import ConstantParams
-from layoff_calculator.infrastructure.config.common import TomlName
+from layoff_calculator.config.common import TomlName
 
 def save_config(path: str | Path, params: ConstantParams) -> None:
     path = Path(path)
