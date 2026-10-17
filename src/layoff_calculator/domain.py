@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
+import numpy as np
 
 @dataclass(frozen=True)
 class Machine:
+    # TODO: validate...
     name: str
     count: int
     profit_per_hour: float
@@ -12,29 +14,13 @@ class Machine:
     repair_hours_mean_36: float
 
 class RepairStrategy(Enum):
-    FIFO = 1
-    WSPT = 2
+    FIFO = auto()
+    WSPT = auto()
 
 @dataclass(frozen=True)
 class ConstantParams:
+    # TODO: validate...
     machines: list[Machine]
     costs_per_hour_3: float
     costs_per_hour_6: float
     costs_per_hour_base: float
-
-@dataclass(frozen=True)
-class SimulationParams:
-    days: int
-    repair_strategy: RepairStrategy
-    global_seed: int
-    is_hot_repair_enabled: bool
-    is_auto_repair_enabled: bool
-
-@dataclass(frozen=True)
-class RunParams:
-    constants: ConstantParams
-    simulation: SimulationParams
-
-@dataclass
-class RunResult:
-    profit: float
