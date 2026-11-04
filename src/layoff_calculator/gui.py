@@ -24,26 +24,35 @@ if TYPE_CHECKING:
     from layoff_calculator.engine import Engine, SimulationParams
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # No-Wheel Subclasses
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class _NoWheelSpinBox(QSpinBox):
     def wheelEvent(self, event):
         event.ignore()
 
+
 class _NoWheelDoubleSpinBox(QDoubleSpinBox):
     def wheelEvent(self, event):
         event.ignore()
+
+
+class _ScientificDoubleSpinBox(_NoWheelDoubleSpinBox):
+    def textFromValue(self, value: float) -> str:
+        if math.isnan(value):
+            return "NaN"
+        return f"{value:.2e}"
+
 
 class _NoWheelComboBox(QComboBox):
     def wheelEvent(self, event):
         event.ignore()
 
-
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Table columns
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
+
 
 COL_NAME, COL_COUNT, COL_PROFIT, COL_MTBF, COL_R3, COL_R6, COL_R36 = range(7)
 
@@ -51,37 +60,37 @@ COLUMN_HEADERS = [
     "Название",
     "Кол-во, шт.",
     "Прибыль, руб./ч.",
-    "M(X) МРП, ч.",
-    "M(X) рем. 3р., ч.",
-    "M(X) рем. 6р., ч.",
-    "M(X) рем. 3р.+6р., ч.",
+    "МО работы, ч.",
+    "МО рем. 3р., ч.",
+    "МО рем. 6р., ч.",
+    "МО рем. 3р.+6р., ч.",
 ]
 
 COLUMN_TOOLTIPS = [
     "Название типа машины",
     "Количество машин данного типа",
-    "Прибыль от работы (или убыток от простоя) в час",
+    "Прибыль от работы (и убыток от простоя) в час",
     "Среднее время работы между поломками (ч)",
-    "Среднее время ремонта силами 3-го разряда (ч)",
-    "Среднее время ремонта силами 6-го разряда (ч)",
+    "Среднее время ремонта силами 3-его разряда (ч)",
+    "Среднее время ремонта силами 6-ого разряда (ч)",
     "Среднее время ремонта силами обоих разрядов (ч)",
 ]
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Validators & delegate
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class _NumberValidator(QValidator):
-    def __init__(self, *, integer: bool, allow_zero: bool,
+    def __init__(self, *, allow_decimals: bool, allow_zero: bool,
                  allow_empty: bool, parent=None):
         super().__init__(parent)
-        self._integer = integer
+        self._alllow_decimals = allow_decimals
         self._allow_zero = allow_zero
         self._allow_empty = allow_empty
 
     def validate(self, text: str, pos: int):
-        s = text.strip().replace(",", ".")
+        s = text.strip()
         if s == "":
             return (
                 (QValidator.Acceptable if self._allow_empty else QValidator.Intermediate),
@@ -90,7 +99,7 @@ class _NumberValidator(QValidator):
         if s in ("-", "+", ".", "-.", "+."):
             return QValidator.Intermediate, text, pos
         try:
-            value = int(s) if self._integer else float(s)
+            value = int(s) if self._alllow_decimals else float(s)
         except ValueError:
             return QValidator.Invalid, text, pos
         if value < 0 or (value == 0 and not self._allow_zero):
@@ -106,47 +115,44 @@ class _MachineDelegate(QStyledItemDelegate):
             return editor
         if col == COL_COUNT:
             editor.setValidator(_NumberValidator(
-                integer=True, allow_zero=False, allow_empty=False, parent=editor))
+                allow_decimals=True, allow_zero=False, allow_empty=False, parent=editor))
         elif col == COL_PROFIT:
             editor.setValidator(_NumberValidator(
-                integer=False, allow_zero=True, allow_empty=False, parent=editor))
+                allow_decimals=False, allow_zero=True, allow_empty=False, parent=editor))
         elif col == COL_MTBF:
             editor.setValidator(_NumberValidator(
-                integer=False, allow_zero=False, allow_empty=False, parent=editor))
+                allow_decimals=False, allow_zero=False, allow_empty=False, parent=editor))
         else:
             editor.setValidator(_NumberValidator(
-                integer=False, allow_zero=False, allow_empty=True, parent=editor))
+                allow_decimals=False, allow_zero=False, allow_empty=True, parent=editor))
         return editor
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Helpers
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
-def _fmt(value: float) -> str:
+def _format(value: float) -> str:
+    if value == math.inf:
+        return ""
     if value == int(value):
         return str(int(value))
     return repr(value)
 
 
-def _fmt_opt(value: float | None) -> str:
-    return "" if value == math.inf or value is None else _fmt(value)
-
-
-def _parse_opt(text: str) -> float | None:
-    text = text.strip().replace(",", ".")
-    return float("inf") if text == "" else float(text)
+def _parse(text: str) -> float | None:
+    text = text.strip()
+    return math.inf if text == "" else float(text)
 
 
 def _help_label(text: str, tooltip: str) -> QWidget:
-    """Создает метку с серой иконкой вопроса и всплывающей подсказкой."""
     widget = QWidget()
     layout = QHBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(6)
 
     label = QLabel(text)
-    
+
     icon_btn = QToolButton()
     icon_btn.setText("?")
     icon_btn.setToolTip(tooltip)
@@ -168,7 +174,7 @@ def _help_label(text: str, tooltip: str) -> QWidget:
     """)
     icon_btn.setFixedSize(14, 14)
     icon_btn.setCursor(Qt.CursorShape.WhatsThisCursor)
-    
+
     layout.addWidget(label)
     layout.addWidget(icon_btn)
     layout.addStretch()
@@ -183,16 +189,9 @@ def _money_spin() -> QDoubleSpinBox:
     return spin
 
 
-def _wrap(layout) -> QWidget:
-    w = QWidget()
-    w.setContentsMargins(0, 0, 0, 0)
-    w.setLayout(layout)
-    return w
-
-
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Machines table widget
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class MachinesTable(QTableWidget):
     MAX_VISIBLE_ROWS = 8
@@ -213,22 +212,23 @@ class MachinesTable(QTableWidget):
         self.model().rowsInserted.connect(self._adjust_height)
         self.model().rowsRemoved.connect(self._adjust_height)
         self.horizontalHeader().sectionResized.connect(self._adjust_height)
-        
+
         self._adjust_height()
 
     def _adjust_height(self, *args) -> None:
         header_height = self.horizontalHeader().height()
         if header_height <= 1:
             header_height = self.horizontalHeader().sizeHint().height()
-            
+
         row_height = self.verticalHeader().defaultSectionSize()
         if row_height <= 0:
             row_height = 30
-            
+
         rows = self.rowCount()
         content_height = header_height + rows * row_height + self.frameWidth() * 2 + 2
-        capped_height = header_height + self.MAX_VISIBLE_ROWS * row_height + self.frameWidth() * 2 + 2
-        
+        capped_height = header_height + self.MAX_VISIBLE_ROWS * \
+            row_height + self.frameWidth() * 2 + 2
+
         self.setFixedHeight(min(content_height, capped_height))
 
     def showEvent(self, event) -> None:
@@ -236,25 +236,35 @@ class MachinesTable(QTableWidget):
         self._adjust_height()
 
     def add_machine(self, machine: Machine | None = None) -> None:
+        if machine is None:
+            machine = Machine(
+                name="Новая машина",
+                count=1,
+                profit_per_hour=0,
+                working_hours_mean=1,
+                repair_hours_mean_3=math.inf,
+                repair_hours_mean_6=math.inf,
+                repair_hours_mean_36=math.inf
+            )
+
         row = self.rowCount()
         self.insertRow(row)
-        if machine is None:
-            values = ["", "1", "0", "1", "", "", ""]
-        else:
-            values = [
-                machine.name,
-                str(machine.count),
-                _fmt(machine.profit_per_hour),
-                _fmt(machine.working_hours_mean),
-                _fmt_opt(machine.repair_hours_mean_3),
-                _fmt_opt(machine.repair_hours_mean_6),
-                _fmt_opt(machine.repair_hours_mean_36),
-            ]
+
+        values = [
+            machine.name,
+            str(machine.count),
+            _format(machine.profit_per_hour),
+            _format(machine.working_hours_mean),
+            _format(machine.repair_hours_mean_3),
+            _format(machine.repair_hours_mean_6),
+            _format(machine.repair_hours_mean_36),
+        ]
         for col, text in enumerate(values):
             self.setItem(row, col, QTableWidgetItem(text))
 
     def remove_selected(self) -> None:
-        rows = sorted({idx.row() for idx in self.selectedIndexes()}, reverse=True)
+        rows = sorted({idx.row()
+                      for idx in self.selectedIndexes()}, reverse=True)
         for r in rows:
             self.removeRow(r)
 
@@ -269,9 +279,9 @@ class MachinesTable(QTableWidget):
                 count=int(self._cell_text(row, COL_COUNT)),
                 profit_per_hour=float(self._cell_text(row, COL_PROFIT)),
                 working_hours_mean=float(self._cell_text(row, COL_MTBF)),
-                repair_hours_mean_3=_parse_opt(self._cell_text(row, COL_R3)),
-                repair_hours_mean_6=_parse_opt(self._cell_text(row, COL_R6)),
-                repair_hours_mean_36=_parse_opt(self._cell_text(row, COL_R36)),
+                repair_hours_mean_3=_parse(self._cell_text(row, COL_R3)),
+                repair_hours_mean_6=_parse(self._cell_text(row, COL_R6)),
+                repair_hours_mean_36=_parse(self._cell_text(row, COL_R36)),
             ))
         return machines
 
@@ -280,9 +290,9 @@ class MachinesTable(QTableWidget):
         return item.text().strip() if item else ""
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Constants panel
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class ConstantsPanel(QGroupBox):
     def __init__(self, parent=None):
@@ -308,9 +318,12 @@ class ConstantsPanel(QGroupBox):
         self.costs_3 = _money_spin()
         self.costs_6 = _money_spin()
         self.costs_base = _money_spin()
-        costs_form.addRow(_help_label("Зарплата 3 разряда, руб./ч.", "Почасовая оплата труда слесаря 3-го разряда."), self.costs_3)
-        costs_form.addRow(_help_label("Зарплата 6 разряда, руб./ч.", "Почасовая оплата труда слесаря 6-го разряда."), self.costs_6)
-        costs_form.addRow(_help_label("Накладные расходы, руб./ч.", "Дополнительные издержки за каждый час работы бригады."), self.costs_base)
+        costs_form.addRow(_help_label("Зарплата 3 разряда, руб./ч.",
+                          "Почасовая оплата труда слесаря 3-го разряда."), self.costs_3)
+        costs_form.addRow(_help_label("Зарплата 6 разряда, руб./ч.",
+                          "Почасовая оплата труда слесаря 6-го разряда."), self.costs_6)
+        costs_form.addRow(_help_label("Накладные расходы, руб./ч.",
+                          "Дополнительные издержки за каждый час работы бригады."), self.costs_base)
         layout.addLayout(costs_form)
 
         io_buttons = QHBoxLayout()
@@ -376,9 +389,9 @@ class ConstantsPanel(QGroupBox):
         self.costs_base.setValue(params.costs_per_hour_base)
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Simulation panel
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class SimulationPanel(QGroupBox):
     def __init__(self, parent=None):
@@ -388,50 +401,58 @@ class SimulationPanel(QGroupBox):
         self.days = _NoWheelSpinBox()
         self.days.setRange(1, 100_000)
         self.days.setValue(200)
-        form.addRow(_help_label("Продолжительность симуляции, дн.", "Длительность одного прогона симуляции в днях."), self.days)
+        form.addRow(_help_label("Продолжительность симуляции, дн.",
+                    "Длительность одного прогона симуляции в днях."), self.days)
 
         self.strategy = _NoWheelComboBox()
         for strategy in RepairStrategy:
             self.strategy.addItem(strategy.name, strategy)
-        form.addRow(_help_label("Стратегия починки", "Порядок выбора машины для ремонта: FIFO (первым пришел - первым обслужен) или WSPT (взвешенное кратчайшее время)."), self.strategy)
+        form.addRow(_help_label("Стратегия починки",
+                    "Порядок выбора машины для ремонта: FIFO (первым пришел - первым обслужен) или WSPT (взвешенное кратчайшее время)."), self.strategy)
 
         self.seed_enabled = QCheckBox()
-        self.seed_enabled.setChecked(True)
+        self.seed_enabled.setChecked(False)
         self.seed_value = _NoWheelSpinBox()
         self.seed_value.setRange(0, 2**31 - 1)
         self.seed_value.setValue(42)
         self.seed_enabled.toggled.connect(self.seed_value.setEnabled)
+        self.seed_value.setEnabled(self.seed_enabled.isChecked())
         seed_row = QHBoxLayout()
         seed_row.addWidget(self.seed_enabled)
         seed_row.addWidget(self.seed_value, 1)
-        form.addRow(_help_label("Зерно симуляции", "Начальное значение генератора случайных чисел для воспроизводимости результатов."), _wrap(seed_row))
+        form.addRow(_help_label("Зерно симуляции",
+                    "Начальное значение генератора случайных чисел для воспроизводимости результатов."), seed_row)
 
         self.max_workers_enabled = QCheckBox()
-        self.max_workers_enabled.setChecked(True)
-        
+        self.max_workers_enabled.setChecked(False)
+
         self.max_workers = _NoWheelSpinBox()
         self.max_workers.setRange(1, 256)
-        self.max_workers.setValue(os.cpu_count() or 4)
-        
+        self.max_workers.setValue(os.cpu_count() or 1)
+        self.max_workers.setEnabled(self.max_workers_enabled.isChecked())
+
         self.max_workers_enabled.toggled.connect(self._on_workers_toggled)
-        
+
         workers_row = QHBoxLayout()
         workers_row.addWidget(self.max_workers_enabled)
         workers_row.addWidget(self.max_workers, 1)
-        form.addRow(_help_label("Макс. параллельных потоков", "Количество одновременно работающих процессов (если галочка снята, используется количество ядер CPU)."), _wrap(workers_row))
+        form.addRow(_help_label("Макс. параллельных потоков",
+                    "Количество одновременно работающих процессов (если галочка снята, используется количество ядер CPU)."), workers_row)
 
         self.hot_repair = QCheckBox("")
-        self.hot_repair.setChecked(False)
-        form.addRow(_help_label("Починка только в 3-ю смену", "Если включено, ремонт машин происходит только в отведенную 3-ю смену."), self.hot_repair)
+        self.hot_repair.setChecked(True)
+        form.addRow(_help_label("Починка только в 3-ю смену",
+                    "Если включено, ремонт машин происходит только в отведенную 3-ю смену."), self.hot_repair)
 
         self.auto_repair = QCheckBox("")
-        self.auto_repair.setChecked(False)
-        form.addRow(_help_label("Мгновенная починка в конце дня", "Если включено, все сломанные машины бесплатно и мгновенно чинятся в конце рабочего дня."), self.auto_repair)
+        self.auto_repair.setChecked(True)
+        form.addRow(_help_label("Мгновенная починка в конце дня",
+                    "Если включено, все сломанные машины бесплатно и мгновенно чинятся в конце рабочего дня."), self.auto_repair)
 
     def _on_workers_toggled(self, checked: bool) -> None:
         self.max_workers.setEnabled(checked)
         if not checked:
-            self.max_workers.setValue(os.cpu_count() or 4)
+            self.max_workers.setValue(os.cpu_count() or 1)
 
     def get_simulation(self) -> SimulationParams:
         from layoff_calculator.engine import SimulationParams
@@ -441,11 +462,11 @@ class SimulationPanel(QGroupBox):
             if self.seed_enabled.isChecked()
             else random.randint(0, 2**31 - 1)
         )
-        
+
         workers = (
-            self.max_workers.value() 
-            if self.max_workers_enabled.isChecked() 
-            else (os.cpu_count() or 4)
+            self.max_workers.value()
+            if self.max_workers_enabled.isChecked()
+            else (os.cpu_count() or 1)
         )
 
         return SimulationParams(
@@ -464,7 +485,7 @@ class SimulationPanel(QGroupBox):
             self.strategy.setCurrentIndex(idx)
         self.seed_enabled.setChecked(True)
         self.seed_value.setValue(params.global_seed)
-        
+
         self.max_workers_enabled.setChecked(True)
         self.max_workers.setValue(params.max_workers)
 
@@ -472,9 +493,9 @@ class SimulationPanel(QGroupBox):
         self.auto_repair.setChecked(params.is_auto_repair_enabled)
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Runs panel
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class RunsPanel(QGroupBox):
     run_requested = Signal(int)
@@ -491,42 +512,49 @@ class RunsPanel(QGroupBox):
         self.add_runs.setValue(10)
 
         self.run_button = QPushButton("Добавить и запустить")
-        self.run_button.setToolTip("Запустить симуляцию для указанного количества новых прогонов")
+        self.run_button.setToolTip(
+            "Запустить симуляцию для указанного количества новых прогонов")
         self.reset_button = QPushButton("Сбросить")
-        self.reset_button.setToolTip("Очистить результаты и разблокировать параметры")
+        self.reset_button.setToolTip(
+            "Очистить результаты и разблокировать параметры")
 
         run_row = QHBoxLayout()
         run_row.addWidget(self.add_runs, 1)
         run_row.addWidget(self.run_button)
         run_row.addWidget(self.reset_button)
-        form.addRow(_help_label("Добавить прогоны", "Количество новых симуляций для запуска."), _wrap(run_row))
+        form.addRow(_help_label("Добавить прогоны",
+                    "Количество новых симуляций для запуска."), run_row)
 
         self.total_runs = _NoWheelSpinBox()
         self.total_runs.setRange(0, 10_000_000)
         self.total_runs.setReadOnly(True)
         self.total_runs.setButtonSymbols(QSpinBox.NoButtons)
-        form.addRow(_help_label("Суммарные прогоны", "Общее количество успешно завершенных симуляций."), self.total_runs)
+        form.addRow(_help_label("Суммарные прогоны",
+                    "Общее количество успешно завершенных симуляций."), self.total_runs)
 
         self.avg_benefit = _NoWheelDoubleSpinBox()
         self.avg_benefit.setRange(-1e15, 1e15)
         self.avg_benefit.setDecimals(2)
         self.avg_benefit.setReadOnly(True)
         self.avg_benefit.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        form.addRow(_help_label("Средняя выгода от прогонов, руб.", "Средняя разница в прибыли: положительное значение означает выгоду от увольнения."), self.avg_benefit)
+        form.addRow(_help_label("Средняя выгода от увольнения, руб.",
+                    "Средняя разница в прибыли: положительное значение означает выгоду от увольнения."), self.avg_benefit)
 
-        self.variance = _NoWheelDoubleSpinBox()
+        self.variance = _ScientificDoubleSpinBox()
         self.variance.setRange(0.0, 1e30)
         self.variance.setDecimals(2)
         self.variance.setReadOnly(True)
         self.variance.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        form.addRow(_help_label("Дисперсия", "Дисперсия разницы в прибыли. Показывает разброс результатов."), self.variance)
+        form.addRow(_help_label(
+            "Дисперсия", "Дисперсия разницы в прибыли. Показывает разброс результатов."), self.variance)
 
         self.bayesian_p = _NoWheelDoubleSpinBox()
         self.bayesian_p.setRange(0.0, 1.0)
         self.bayesian_p.setDecimals(4)
         self.bayesian_p.setReadOnly(True)
         self.bayesian_p.setButtonSymbols(QDoubleSpinBox.NoButtons)
-        form.addRow(_help_label("Вероятность (Байес)", "Вероятность того, что увольнение выгодно (0.5 = 50/50, 1.0 = 100% уверенность)."), self.bayesian_p)
+        form.addRow(_help_label("Вероятность выгоды от увльнения",
+                    "Вероятность того, что увольнение выгодно (0.5 = 50/50, 1.0 = 100% уверенность)."), self.bayesian_p)
 
         self.run_button.clicked.connect(self._on_run_clicked)
         self.reset_button.clicked.connect(self.reset_requested.emit)
@@ -548,7 +576,7 @@ class RunsPanel(QGroupBox):
             variance = 0.0
         if math.isnan(p):
             p = 0.5
-            
+
         self.total_runs.setValue(total)
         self.avg_benefit.setValue(avg)
         self.variance.setValue(variance)
@@ -556,15 +584,17 @@ class RunsPanel(QGroupBox):
         self.reset_button.setEnabled(not self._busy and total > 0)
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Simulation worker (QThread)
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class SimulationWorker(QThread):
     """Submits runs to the engine's process pool and polls for completion."""
 
-    progress = Signal(int, int, float, float, float)   # (completed, submitted, mean, variance, p)
-    succeeded = Signal(object)                         # (completed, mean, variance, p)
+    # (completed, submitted, mean, variance, p)
+    progress = Signal(int, int, float, float, float)
+    # (completed, mean, variance, p)
+    succeeded = Signal(object)
     failed = Signal(str)
 
     POLL_INTERVAL_S: float = 0.05
@@ -582,14 +612,15 @@ class SimulationWorker(QThread):
         try:
             self._engine.make_runs(self._count)
             while (
-                not self._abort 
+                not self._abort
                 and self._engine.completed_runs_count < self._engine.submitted_runs_count
             ):
                 self._engine.check_pending_results()
-                
+
                 stdev = self._engine.layoff_profit_stdev
-                variance = (stdev ** 2) if not math.isnan(stdev) else float("nan")
-                
+                variance = (
+                    stdev ** 2) if not math.isnan(stdev) else float("nan")
+
                 self.progress.emit(
                     self._engine.completed_runs_count,
                     self._engine.submitted_runs_count,
@@ -598,13 +629,14 @@ class SimulationWorker(QThread):
                     self._engine.layoff_profit_bayesian_p,
                 )
                 time.sleep(self.POLL_INTERVAL_S)
-                
+
             if not self._abort:
                 self._engine.check_pending_results()
-                
+
                 stdev = self._engine.layoff_profit_stdev
-                variance = (stdev ** 2) if not math.isnan(stdev) else float("nan")
-                
+                variance = (
+                    stdev ** 2) if not math.isnan(stdev) else float("nan")
+
                 self.succeeded.emit((
                     self._engine.completed_runs_count,
                     self._engine.layoff_profit_mean,
@@ -616,9 +648,9 @@ class SimulationWorker(QThread):
                 self.failed.emit(str(exc))
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Main window
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -652,10 +684,10 @@ class MainWindow(QMainWindow):
 
     def _load_defaults(self) -> None:
         defaults = [
-            Machine("Экскаватор", 4, 500.0, 4.0, 2.0, 1.0, 0.25),
-            Machine("Бульдозер",  6, 300.0, 6.0, None, 2.0, 1.5),
-            Machine("Автокран",   3, 650.0, 5.0, None, 2.5, 1.5),
-            Machine("Самосвал",   5, 400.0, 8.0, 2.5, 1.5, 0.75),
+            Machine("Экскаватор", 4, 500.0, 4.0, 2.0,      1.0, 0.25),
+            Machine("Бульдозер",  6, 300.0, 6.0, math.inf, 2.0, 1.5),
+            Machine("Автокран",   3, 650.0, 5.0, math.inf, 2.5, 1.5),
+            Machine("Самосвал",   5, 400.0, 8.0, 2.5,      1.5, 0.75),
         ]
         self.constants_panel.set_constants(ConstantParams(
             machines=defaults,
@@ -740,17 +772,17 @@ class MainWindow(QMainWindow):
         if self._worker is not None and self._worker.isRunning():
             self._worker.stop()
             self._worker.wait(5000)
-            
+
         if self._engine is not None:
             self._engine.close()
             self._engine = None
-            
+
         super().closeEvent(event)
 
 
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 # Entry point
-# ─────────────────────────────────────────────────────────────
+# -------------------------------
 
 def main() -> int:
     app = QApplication([])
