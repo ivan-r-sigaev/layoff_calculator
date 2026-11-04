@@ -6,13 +6,25 @@ import numpy as np
 
 @dataclass(frozen=True)
 class SimulationParams:
-    # TODO: validate...
     days: int
     repair_strategy: RepairStrategy
     global_seed: int
     max_workers: int
     is_hot_repair_enabled: bool
     is_auto_repair_enabled: bool
+
+    def __post_init__(self):
+        if self.days <= 0:
+            raise ValueError(f"Simulation duration must be > 0 (got {self.days}).")
+        
+        if self.max_workers <= 0:
+            raise ValueError(f"Number of worker threads must be > 0 (got {self.max_workers}).")
+        
+        if self.global_seed < 0:
+            raise ValueError(f"Simulation seed must be > 0 (got {self.global_seed}).")
+        
+        if not isinstance(self.repair_strategy, RepairStrategy):
+            raise ValueError(f"Invalid repair strategy: {self.repair_strategy}.")
 
 @dataclass(frozen=True)
 class RunParams:
