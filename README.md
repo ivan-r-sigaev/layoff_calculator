@@ -8,8 +8,8 @@
 
 ## Требования
 
-- Python 3.11+
-- UV (https://docs.astral.sh/uv/)
+- Python 3.14+
+- uv (https://docs.astral.sh/uv/)
 
 ## Сборка и запуск
 
